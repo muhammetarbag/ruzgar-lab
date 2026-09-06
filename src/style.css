@@ -1942,3 +1942,8 @@ body { background: #0b121b; }
 }
 
 .chip.active, .camera-controls .view-button.active { background: #1c3e50; border-color: var(--blue); color: var(--blue); }
+/* The approximation remains visible beside the scene, not only in help. */
+.flow-model-note { display: grid; gap: 4px; padding: 12px 18px; border-top: 1px solid var(--line); font-size: 12px; line-height: 1.5; color: var(--muted); }
+.flow-model-note strong { color: var(--ink); font-weight: 500; }
+.flow-model-note [data-state="error"] { color: #efae70; }
+.flow-model-note [hidden] { display: none; }

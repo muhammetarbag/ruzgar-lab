@@ -2,8 +2,23 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { centerModel, disposeObject, projectedArea } from "./models";
 import type { Conditions } from "./physics";
+import { positionAtTime, type FlowPath, type Point } from "./flow-field";
+import { meshTriangles, type FlowRequest } from "./flow-geometry";
+import type { FlowResponse } from "./flow.worker";
 
 export type DisplayMode = "flow" | "pressure" | "combined";
+
+class FlowCurve extends THREE.Curve<THREE.Vector3> {
+  private next = new THREE.Vector3();
+  constructor(private points: Point[]) { super(); }
+  override getPoint(t: number, target = new THREE.Vector3()) {
+    const index = t * (this.points.length - 1), i = Math.min(Math.floor(index), this.points.length - 2);
+    return target.fromArray(this.points[i]).lerp(this.next.fromArray(this.points[i + 1]), index - i);
+  }
+  // Tube vertices must hit every traced sample, including sharp voxel corners.
+  override getPointAt(t: number, target = new THREE.Vector3()) { return this.getPoint(t, target); }
+  override getTangentAt(t: number, target = new THREE.Vector3()) { return this.getTangent(t, target); }
+}
 
 export class TunnelScene {
   renderer: THREE.WebGLRenderer;
@@ -16,7 +31,10 @@ export class TunnelScene {
   private vectors = new THREE.Group();
   private bounds = new THREE.Box3();
   private state!: Conditions;
-  private paths: THREE.Vector3[][] = [];
+  private paths: FlowPath[] = [];
+  private renderedPaths: FlowPath[] = [];
+  private flowWorker?: Worker;
+  private flowTimer = 0;
   private dots = new THREE.Points();
   private phase = 0;
   private running = !matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -24,6 +42,7 @@ export class TunnelScene {
   private showParticles = true;
   private showVectors = false;
   private displayMode: DisplayMode = "flow";
+  private currentView = "perspective";
   private originalMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
   // Yalnızca yüzey yönelimine bağlı öğretici renkler; basınç / Cp çözümü değil.
   private pressureMaterial = new THREE.ShaderMaterial({
@@ -112,7 +131,7 @@ export class TunnelScene {
     this.animate();
   }
 
-  setObject(group: THREE.Group) {
+  setObject(group: THREE.Group, state: Conditions = this.state) {
     this.restoreMaterials();
     this.scene.remove(this.object);
     disposeObject(this.object);
@@ -121,7 +140,8 @@ export class TunnelScene {
       .setFromObject(this.object)
       .getSize(new THREE.Vector3());
     this.scene.add(this.object);
-    this.update(this.state, true);
+    this.update(state, true);
+    this.setView(this.currentView);
     this.applyDisplayMaterial();
   }
 
@@ -209,71 +229,80 @@ export class TunnelScene {
   }
 
   private makeFlow() {
+    clearTimeout(this.flowTimer);
+    this.flowWorker?.terminate();
+    this.flowWorker = undefined;
     disposeObject(this.flow);
     this.flow.clear();
-    disposeObject(this.vectors);
-    this.vectors.clear();
     this.paths = [];
-    const s = this.state,
-      size = this.bounds.getSize(new THREE.Vector3());
-    const rx = Math.max(size.x / 2, 0.25),
-      ry = Math.max(size.y / 2, 0.12),
-      rz = Math.max(size.z / 2, 0.15);
-    const segments = 110,
-      rows = 9,
-      layers = 3;
+    this.renderedPaths = [];
+    const status = document.querySelector<HTMLElement>("#flow-status")!;
+    status.dataset.state = "pending";
+    delete status.dataset.residual;
+    delete status.dataset.paths;
+    status.textContent = "Geometriye göre akış hesaplanıyor…";
+    // Coalesce slider changes and discard every obsolete geometry calculation.
+    this.flowTimer = window.setTimeout(() => {
+      const worker = new Worker(new URL("./flow.worker.ts", import.meta.url), { type: "module" });
+      this.flowWorker = worker;
+      const request: FlowRequest = {
+        meshes: meshTriangles(this.object),
+        minimum: this.bounds.min.toArray() as [number, number, number],
+        maximum: this.bounds.max.toArray() as [number, number, number],
+        length: this.state.tunnelLength, height: this.state.tunnelHeight, width: this.state.tunnelWidth,
+      };
+      const fail = (message: string) => {
+        if (this.flowWorker !== worker) return;
+        status.dataset.state = "error";
+        status.textContent = `Akış gösterilemiyor: ${message}`;
+        worker.terminate();
+        this.flowWorker = undefined;
+      };
+      worker.onerror = () => fail("Hesaplama başlatılamadı. Sayfayı yenileyin.");
+      worker.onmessage = (event: MessageEvent<FlowResponse>) => {
+        if (this.flowWorker !== worker) return;
+        const response = event.data;
+        if (response.error) { fail(response.error); return; }
+        this.paths = response.paths;
+        this.drawFlow();
+        status.dataset.state = "ready";
+        status.dataset.residual = String(response.residual);
+        status.dataset.paths = String(this.paths.length);
+        status.textContent = "İdeal akış · geometriye göre hesaplandı";
+        worker.terminate();
+        this.flowWorker = undefined;
+      };
+      worker.postMessage(request, request.meshes.map(mesh => mesh.buffer));
+    }, 120);
+  }
+
+  private drawFlow() {
+    disposeObject(this.flow);
+    this.flow.clear();
+    this.renderedPaths = this.paths.filter(path => this.currentView === "side"
+      ? path.plane === "xy" : this.currentView === "top" ? path.plane === "xz" : path.plane !== "xz");
     const lines = new THREE.Group();
     lines.name = "lines";
     lines.visible = this.showLines;
-    for (let layer = 0; layer < layers; layer++)
-      for (let row = 0; row < rows; row++) {
-        const y0 = ((row + 0.5) / rows - 0.5) * s.tunnelHeight * 0.85;
-        const z0 =
-          ((layer + 0.5) / layers - 0.5) * s.tunnelWidth * 0.72 + 0.025;
-        const r = Math.sqrt((y0 / ry) ** 2 + (z0 / rz) ** 2);
-        const path: THREE.Vector3[] = [];
-        for (let j = 0; j <= segments; j++) {
-          const x = (j / segments - 0.5) * s.tunnelLength;
-          // Şematik yollar: geometriyi çevreleyen kutu boyutlarından yumuşak sapma.
-          // Navier–Stokes veya yerel hız / basınç alanı çözümü değildir.
-          const bump = Math.exp(-Math.pow(Math.abs(x) / (rx * 1.5 + 0.3), 4));
-          const factor = Math.sqrt(r * r + 2.8 * bump) / Math.max(r, 0.001);
-          const y = s.tunnelHeight / 2 + y0 * factor;
-          const z = z0 * factor;
-          const point = new THREE.Vector3(x, y, z);
-          path.push(point);
-        }
-        this.paths.push(path);
-        const curve = new THREE.CatmullRomCurve3(path, false, "centripetal");
-        lines.add(new THREE.Mesh(
-          new THREE.TubeGeometry(curve, segments, 0.014, 5, false),
-          new THREE.MeshBasicMaterial({ color: "#8acfe5", toneMapped: false }),
-        ));
-      }
+    const radius = Math.min(0.012, Math.max(0.003, this.bounds.getSize(new THREE.Vector3()).length() * 0.003));
+    for (const path of this.renderedPaths) {
+      // Piecewise linear curve: Catmull-Rom overshoot can cross a solid surface.
+      const curve = new FlowCurve(path.points);
+      lines.add(new THREE.Mesh(
+        new THREE.TubeGeometry(curve, path.points.length - 1, radius, 4, false),
+        new THREE.MeshBasicMaterial({ color: "#8acfe5", toneMapped: false, transparent: true, opacity: 0.7 }),
+      ));
+    }
     this.flow.add(lines);
     const dotGeometry = new THREE.BufferGeometry();
-    dotGeometry.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(
-        new Float32Array(this.paths.length * 5 * 3),
-        3,
-      ),
-    );
-    this.dots = new THREE.Points(
-      dotGeometry,
-      new THREE.PointsMaterial({
-        color: "#efae70",
-        toneMapped: false,
-        size: 0.10,
-        transparent: true,
-        opacity: 1,
-        sizeAttenuation: true,
-      }),
-    );
+    dotGeometry.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(this.renderedPaths.length * 5 * 3), 3));
+    this.dots = new THREE.Points(dotGeometry, new THREE.PointsMaterial({
+      color: "#efae70", toneMapped: false, size: radius * 7, sizeAttenuation: true,
+    }));
     this.dots.visible = this.showParticles;
     this.flow.add(this.dots);
     this.updateParticles();
-    this.flow.visible = this.displayMode !== "pressure" && s.speed > 0;
+    this.flow.visible = this.displayMode !== "pressure" && this.state.speed > 0;
   }
 
   setForces(drag: number | null, lift: number | null) {
@@ -356,15 +385,22 @@ export class TunnelScene {
     }
   }
   setView(view: string) {
+    this.currentView = view;
     const y = this.state.tunnelHeight / 2;
     const target = new THREE.Vector3(0, y, 0);
+    const size = this.bounds.isEmpty() ? new THREE.Vector3(3, 2, 3) : this.bounds.getSize(new THREE.Vector3());
+    const tangent = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const fit = (width: number, height: number) => Math.max(2.5, 1.7 * Math.max(width / this.camera.aspect, height) / (2 * tangent));
     this.controls.target.copy(target);
-    if (view === "side") this.camera.position.set(0, y + 0.01, 15);
-    else if (view === "top") this.camera.position.set(0, y + 18, 0.01);
-    else if (view === "front") this.camera.position.set(-15, y + 0.01, 0);
-    else this.camera.position.set(-6.5, y + 4, 9);
+    if (view === "side") this.camera.position.set(0, y + 0.001, fit(size.x, size.y) + size.z / 2);
+    else if (view === "top") this.camera.position.set(0, y + fit(size.x, size.z) + size.y / 2, 0.001);
+    else if (view === "front") this.camera.position.set(-fit(size.z, size.y) - size.x / 2, y + 0.001, 0);
+    else this.camera.position.copy(new THREE.Vector3(-0.52, 0.32, 0.72).normalize().multiplyScalar(Math.max(3, size.length() * 2))).add(target);
     this.camera.lookAt(target);
     this.controls.update();
+    const slice = document.querySelector<HTMLElement>("#flow-slice");
+    if (slice) slice.textContent = view === "side" ? "Yan görünüm: başlangıç düzlemi XY" : view === "top" ? "Üst görünüm: başlangıç düzlemi XZ" : "3D görünüm: üç akış düzlemi";
+    if (this.paths.length) this.drawFlow();
   }
   setRunning(running: boolean) {
     this.running = running;
@@ -373,23 +409,14 @@ export class TunnelScene {
     return this.running;
   }
   private updateParticles() {
-    if (!this.paths.length) return;
+    if (!this.renderedPaths.length) return;
     const positions = this.dots.geometry.getAttribute("position");
-    const p = new THREE.Vector3();
-    this.paths.forEach((path, i) => {
+    this.renderedPaths.forEach((path, i) => {
+      const duration = path.times[path.times.length - 1];
       for (let n = 0; n < 5; n++) {
-        const f =
-          ((this.phase + n / 5 + (i % 11) / 11) % 1) * (path.length - 1);
-        const j = Math.floor(f);
-        p.lerpVectors(path[j], path[Math.min(j + 1, path.length - 1)], f - j);
-        const wake =
-          Math.max(0, p.x - this.bounds.max.x) / this.state.tunnelLength;
-        p.y +=
-          ((Math.sin(p.x * 3 + i + this.phase * 40) * this.state.turbulence) /
-            100) *
-          wake *
-          2;
-        positions.setXYZ(i * 5 + n, p.x, p.y, p.z);
+        const time = (this.phase + (n / 5 + (i % 11) / 11) * duration) % duration;
+        const p = positionAtTime(path, time);
+        positions.setXYZ(i * 5 + n, ...p);
       }
     });
     positions.needsUpdate = true;
@@ -400,7 +427,7 @@ export class TunnelScene {
       dt = Math.min((now - this.lastTime) / 1000, 0.05);
     this.lastTime = now;
     if (this.running && !document.hidden && this.state.speed > 0) {
-      this.phase += ((dt * this.state.speed) / this.state.tunnelLength) * 0.16;
+      this.phase += dt * this.state.speed * 0.16;
       this.updateParticles();
     }
     this.controls.update();
@@ -417,6 +444,8 @@ export class TunnelScene {
     );
   }
   dispose() {
+    clearTimeout(this.flowTimer);
+    this.flowWorker?.terminate();
     cancelAnimationFrame(this.frame);
     this.observer.disconnect();
     this.controls.dispose();

@@ -29,6 +29,8 @@ def wind(page: Page, base: str) -> None:
  page.on('pageerror',lambda e:errors.append(str(e)))
  page.on('console',lambda m:errors.append(m.text) if m.type=='error' else None)
  page.goto(base+'/ruzgar-lab/',wait_until='networkidle')
+ expect(page.locator('#flow-status')).to_have_attribute('data-state','ready',timeout=30000)
+ assert float(page.locator('#flow-status').get_attribute('data-residual')) < 1e-5
  responsive(page,'ruzgar')
  page.locator('[data-model="sphere"]').click()
  before=number(page,'#drag')
@@ -42,8 +44,24 @@ def wind(page: Page, base: str) -> None:
  passed('ruzgar: speed squared force, zero wind, blank-input recovery')
  page.locator('#reset').click()
  for model in page.locator('[data-model]').all():
-  model.click();page.wait_for_timeout(70)
+  model.click()
+  expect(page.locator('#flow-status')).to_have_attribute('data-state','ready',timeout=30000)
+  assert float(page.locator('#flow-status').get_attribute('data-residual')) < 1e-5
   assert math.isfinite(number(page,'#drag'))
+ passed('ruzgar: all six geometry-dependent flow calculations converge')
+ # A stale calculation must not overwrite the most recent model/orientation.
+ page.locator('[data-model="sphere"]').click()
+ page.locator('[data-model="wing"]').click()
+ page.locator('[data-model="cube"]').click()
+ expect(page.locator('#flow-status')).to_have_attribute('data-state','ready',timeout=30000)
+ expect(page.locator('#scene-title')).to_contain_text('Küp')
+ page.locator('#scale').fill('5');page.locator('#scale').blur()
+ page.locator('#tunnelWidth').evaluate('(el)=>{el.value="2";el.dispatchEvent(new Event("input",{bubbles:true}))}')
+ expect(page.locator('#flow-status')).to_have_attribute('data-state','error',timeout=30000)
+ expect(page.locator('#flow-status')).to_contain_text('sığmıyor')
+ page.locator('#reset').click()
+ expect(page.locator('#flow-status')).to_have_attribute('data-state','ready',timeout=30000)
+ passed('ruzgar: obsolete solve cancellation, invalid geometry warning, recovery')
  page.locator('[data-model="wing"]').click()
  page.locator('#pitch').fill('15');page.locator('#pitch').blur();page.wait_for_timeout(150)
  assert page.locator('#drag').inner_text()=='—'
@@ -57,6 +75,8 @@ def wind(page: Page, base: str) -> None:
  for view in ['side','top','front','perspective']:
   page.locator(f'[data-view="{view}"]').click()
   expect(page.locator(f'[data-view="{view}"]')).to_have_class('view-button active')
+  if view == 'side':expect(page.locator('#flow-slice')).to_contain_text('XY')
+  if view == 'top':expect(page.locator('#flow-slice')).to_contain_text('XZ')
  for layer in ['lines','particles','vectors','wireframe']:
   page.locator(f'[data-layer="{layer}"]').check()
   page.locator(f'[data-layer="{layer}"]').uncheck()

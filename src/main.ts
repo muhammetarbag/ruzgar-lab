@@ -98,8 +98,7 @@ $("#app").innerHTML = `
         <details class="advanced"><summary>Diğer hava ayarları</summary><div class="details-body">
           <label class="check-row"><input type="checkbox" id="autoViscosity" checked/> Sıcaklıktan viskozite hesapla</label>
           ${control("viscosity", "Dinamik viskozite", "Pa·s", 0.000001, 0.0001, 0.000001)}
-          ${control("turbulence", "İz bölgesi dalgalanması", "%", 0, 30, 1)}
-          <p class="hint">Dalgalanma yalnızca parçacık animasyonunu etkiler; kuvvet hesabına girmez.</p>
+          <p class="hint">Viskozite Reynolds sayısını etkiler. İdeal akış görünümü viskozite ve türbülansı çözmez.</p>
         </div></details>
       </section>
       <section class="settings-section"><div class="section-heading"><h2>Cisim ve yönelim</h2>${icon("cube")}</div>
@@ -130,6 +129,7 @@ $("#app").innerHTML = `
       <section class="scene-card" aria-label="3D deney sahnesi">
         <div class="scene-top"><div><span class="eyebrow">TEST BÖLGESİ</span><h2 id="scene-title">Kanat profili <span>NACA 0012</span></h2></div><span class="live-badge" id="live-badge"><span class="status-dot"></span> Akış açık</span></div>
         <div id="viewport"><div class="flow-direction">HAVA AKIŞI ${icon("arrow", 25)} <span>+X</span></div><div class="scene-caption"><span id="dimension-label">—</span><span>1 ızgara aralığı = 1 m</span></div><div id="render-error" hidden></div></div>
+        <div class="flow-model-note"><strong id="flow-status" role="status" data-state="pending">Akış hesaplanıyor…</strong><span>Viskozitesiz ideal akış · Ayrılma ve türbülans çözülmez</span><span id="flow-slice">3D görünüm: üç akış düzlemi</span><span id="wing-flow-note">Kanatta dolaşım/Kutta koşulu çözülmez; kaldırma, ayrı katsayı hesabıdır.</span></div>
         <div class="display-controls" role="group" aria-label="Gösterim modu">
           <span>GÖRÜNÜM</span>
           <button class="display-button active" data-display="flow" aria-pressed="true">Akış</button>
@@ -146,7 +146,7 @@ $("#app").innerHTML = `
           <div class="play-controls"><button id="play" class="button play-button">${icon("pause", 16)}<span>Duraklat</span></button><span class="slow-note">Animasyon yavaşlatılmıştır</span></div>
           <div class="camera-controls" aria-label="Kamera görünümü"><button data-view="perspective" class="view-button active">3D</button><button data-view="side" class="view-button">Yan</button><button data-view="top" class="view-button">Üst</button><button data-view="front" class="view-button">Ön</button><button id="screenshot" class="icon-button" title="Sahneyi PNG olarak indir" aria-label="Sahneyi PNG olarak indir">${icon("camera")}</button></div>
         </div>
-        <div class="visual-options"><label><input data-layer="lines" type="checkbox" checked/><span>Akış çizgileri</span></label><label><input data-layer="particles" type="checkbox" checked/><span>Parçacıklar</span></label><label><input data-layer="vectors" type="checkbox"/><span>Kuvvet yönleri</span></label><label><input data-layer="wireframe" type="checkbox"/><span>Tel kafes</span></label><span class="schematic-note">Mavi: şematik yollar · Turuncu: hareket yönü · Renkler hız/basınç ölçümü değil</span></div>
+        <div class="visual-options"><label><input data-layer="lines" type="checkbox" checked/><span>Akış çizgileri</span></label><label><input data-layer="particles" type="checkbox" checked/><span>Parçacıklar</span></label><label><input data-layer="vectors" type="checkbox"/><span>Kuvvet yönleri</span></label><label><input data-layer="wireframe" type="checkbox"/><span>Tel kafes</span></label><span class="schematic-note">Mavi: ideal akım çizgileri · Turuncu: hesaplanan hızla hareket · Renkler hız/basınç ölçeği değil</span></div>
       </section>
 
       <section class="model-section"><div class="model-section-heading"><div><span class="eyebrow">MODEL KÜTÜPHANESİ</span><h2>Bugün neyi test ediyoruz?</h2></div><span class="small-note">Bir cisim seç, koşulları değiştir.</span></div>
@@ -169,7 +169,7 @@ $("#app").innerHTML = `
       <div class="result-list"><div><span>Dinamik basınç <small>q = ½ρV²</small></span><strong id="dynamic-pressure">—</strong></div><div><span>Reynolds sayısı <small>Re = ρVL / μ</small></span><strong id="reynolds">—</strong></div><div><span>Mach sayısı</span><strong id="mach">—</strong></div><div><span>Referans alanı <small id="reference-label">Kanat planform alanı</small></span><strong id="reference-area">—</strong></div><div><span>Karakteristik boy</span><strong id="reference-length">—</strong></div><div><span>Tıkanma oranı <small>İzdüşüm / tünel kesiti</small></span><strong id="blockage">—</strong></div></div>
       <div class="coefficients"><div><span>Cᴅ</span><strong id="result-cd">—</strong></div><div><span>Cʟ</span><strong id="result-cl">—</strong></div></div>
       <div id="warnings" aria-live="polite"></div>
-      <div class="reading-note">${icon("info", 18)}<div><strong>Bu değerleri nasıl okumalı?</strong><p>Kuvvetler seçili katsayılardan hesaplanır. Çizgiler cismin çevresindeki akışı temsilen gösterir; yüzey basıncı ölçümü değildir.</p><button id="method" class="text-button">Hesaplama yöntemi ${icon("arrow", 13)}</button></div></div>
+      <div class="reading-note">${icon("info", 18)}<div><strong>Bu değerleri nasıl okumalı?</strong><p>Kuvvetler seçili katsayılardan hesaplanır; ideal akış alanından türetilmez. Basınç renkleri yalnızca yüzey yönelimini temsil eder.</p><button id="method" class="text-button">Hesaplama yöntemi ${icon("arrow", 13)}</button></div></div>
     </aside>
   </main>
   <div id="toast" role="status" aria-live="polite"></div>
@@ -180,16 +180,16 @@ $("#app").innerHTML = `
     <h3>Geometri ve katsayılar</h3><p>Küp, küre, inek ve araçlarda alan, döndürülmüş üçgen yüzeylerin akışa dik izdüşümünün 160 × 160 ızgarada yaklaşık birleşim alanıdır. Karakteristik boy, yönelimden önceki en uzun boyuttur. Kanatta referans alanı 1,2 × 3,6 m² planform alanıdır; karakteristik boy 1,2 m veterdir. Ölçek alanı karesiyle, boyu doğrusal değiştirir. Elle alan girerseniz o değer sabit kalır.</p>
     <p>Kanat NACA 0012 kesitli, açıklık oranı 3 olan temsili sonlu kanattır. Otomatik modda Cʟ = 2πα / (1 + 2/3), Cᴅ = 0,02 + Cʟ²/(π·3·0,8). Yalnızca |α| ≤ 12°, |β| ≤ 15° ve |yatış| ≤ 15° için kuvvet gösterilir; stall modellenmez. Kuvvet yönleri şematiktir, vektör boyları logaritmik görsel ölçek kullanır.</p>
     <p>Diğer modellerin başlangıç Cᴅ değerleri eğitim amaçlı varsayımlardır (inek 0,9; Spider 0,45; Connect 0,4; küre 0,47; küp 1,05). Bunlar belirli bir aracın ölçülmüş katsayıları değildir. Manuel katsayılar açı, Reynolds sayısı veya türbülansla otomatik değişmez; uygun veriniz varsa düzenleyin.</p>
-    <h3>Görselleştirme sınırları</h3><p>Akış yolları cismin çevreleyen kutusuna göre saptırılır; ayrıntılı geometri üzerinde akış denklemi çözülmez. Renkler dekoratiftir; yerel hız veya basınç ölçeği değildir. Parçacık hareketi yavaşlatılmıştır. İz bölgesi dalgalanması yalnızca animasyona etki eder. Zemin, duvar, sıkıştırılabilirlik ve cisimler arası etkileşim çözülmez. Her deney tek cisim içindir.</p>
+    <h3>Görselleştirme sınırları</h3><p>Üçgen geometri, cisim yakınında sıklaşan bir 3D hücre ağına aktarılır. Bu ağ üzerinde sıkıştırılamaz ve dönüsüz ideal akış için Laplace denklemi çözülür; çizgiler hesaplanan hız alanını izler. Cisim yüzeylerinde ve tünelin yan duvarlarında normal hız sıfırdır (kayma sınırı). Giriş ve çıkışta potansiyel farkı uygulanır; ortalama giriş hızı seçtiğiniz değere ölçeklenir. Parçacıklar aynı alanın yerel hızıyla, 0,16× yavaşlatılmış olarak hareket eder. İnce ayrıntılar hücre boyutu kadar kalınlaşabilir; açık modellerde yalnızca yüzey hücreleri engel sayılır. Bu, viskoz Navier–Stokes/CFD çözümü değildir: sınır tabaka, ayrılma, girdap izi, türbülans, stall ve sıkıştırılabilirlik çözülmez. Kanatta dolaşım ve Kutta koşulu yoktur; dolayısıyla bu çizgiler kaldırmayı üreten gerçek kanat akışını göstermez. Kuvvetler ayrı katsayı hesabıdır. Basınç renkleri yalnızca yüzey yöneliminden gelir; hesaplanan Pa/Cₚ değerleri değildir.</p>
     <h3>Kendi modelini yükle</h3><p>GLB / glTF 2.0, OBJ ve ASCII / binary STL desteklenir. glTF'nin .bin ve dokularını birlikte seçin. OBJ malzemeleri içe aktarılmaz. Sıkıştırmalı Draco, Meshopt, KTX, iskelet animasyonu ve morph modellerini önce statik, sıkıştırmasız mesh olarak dışa aktarın. 50 MB ve 150 bin üçgen sınırı vardır.</p>
     <p>Yüklenen modelin en uzun boyutu başlangıçta <strong>1 metreye</strong> normalize edilir. Gerçek uzunluğu metre cinsinden ölçek alanına girin (ör. 4,4 m → 4,4×). Gerekirse açılarla düzeltin: yukarı +Y, hava akışı +X. Yükleme Cᴅ veya Cʟ'yi geometriden çıkarmaz; bu katsayıları siz seçersiniz.</p>
-    <h3>Kaynaklar</h3><p><a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/drag-equation/" target="_blank" rel="noopener">NASA — Sürükleme denklemi</a> · <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/drag-coefficient/" target="_blank" rel="noopener">NASA — Katsayı ve referans alanı</a> · <a href="https://threejs.org/docs/pages/GLTFLoader.html" target="_blank" rel="noopener">Three.js — Model yükleme</a></p>
+    <h3>Kaynaklar</h3><p><a href="https://web.mit.edu/fluids-modules/www/potential_flows/LecturesHTML/lec1011/node1.html" target="_blank" rel="noopener">MIT — İdeal akış ve sınır koşulları</a> · <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/boundary-layer/" target="_blank" rel="noopener">NASA — Sınır tabaka ve ayrılma</a> · <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/drag-equation/" target="_blank" rel="noopener">NASA — Sürükleme denklemi</a> · <a href="https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/drag-coefficient/" target="_blank" rel="noopener">NASA — Katsayı ve referans alanı</a> · <a href="https://threejs.org/docs/pages/GLTFLoader.html" target="_blank" rel="noopener">Three.js — Model yükleme</a></p>
   </div></dialog>`;
 
 let tunnel: TunnelScene;
 try {
   tunnel = new TunnelScene($("#viewport"), state);
-  tunnel.setObject(selected.build());
+  tunnel.setObject(selected.build(), state);
 } catch (error) {
   $("#render-error").hidden = false;
   $("#render-error").textContent =
@@ -262,6 +262,7 @@ function update(geometryChanged = false) {
   disable("cd", selected.id === "wing" && state.autoWing);
   disable("cl", selected.id === "wing" && state.autoWing);
   $("#wing-auto-row").hidden = selected.id !== "wing";
+  $("#wing-flow-note").hidden = selected.id !== "wing";
   const computedInput = (key: string, value: number | null) => {
     $<HTMLInputElement>(`#${key}`).value = value === null ? "" : String(value);
     $<HTMLInputElement>(`[data-range="${key}"]`).value = String(value ?? 0);
@@ -393,7 +394,7 @@ function selectModel(spec: ModelSpec) {
     manualArea: false,
     autoWing: true,
   };
-  tunnel.setObject(spec.build());
+  tunnel.setObject(spec.build(), state);
   document.querySelectorAll<HTMLElement>("[data-model]").forEach((b) => {
     b.classList.toggle("selected", b.dataset.model === spec.id);
     b.setAttribute("aria-pressed", String(b.dataset.model === spec.id));

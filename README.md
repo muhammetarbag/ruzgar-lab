@@ -14,7 +14,7 @@ Tarayıcı: http://127.0.0.1:5173/
 ```sh
 npm test
 npm run build
-npm run preview
+npm run preview -- --base /ruzgar-lab/
 ```
 
 Üretim çıktısı `dist/` dizinindedir. Geliştirme sunucusu yalnızca `127.0.0.1` üzerinde dinler; otomatik açılış servisi kurulmaz.
@@ -38,9 +38,17 @@ Yüklenen modelin en uzun boyutu **1 metreye normalize edilir**. Örneğin gerç
 
 ## Hesaplama sınırları
 
-Bu uygulama CFD çözmez. Kuvvetler `F = 0.5 × ρ × V² × A × C` bağıntısıyla, seçilen katsayılarla bulunur. Kuru hava yoğunluğu ideal gaz bağıntısıyla, viskozite Sutherland bağıntısıyla hesaplanır. Manuel viskozite Re değerini değiştirir; katsayıları otomatik değiştirmez.
+Bu uygulama viskoz Navier–Stokes çözmez. Kuvvetler `F = 0.5 × ρ × V² × A × C` bağıntısıyla, seçilen katsayılarla bulunur. Kuru hava yoğunluğu ideal gaz bağıntısıyla, viskozite Sutherland bağıntısıyla hesaplanır. Manuel viskozite Re değerini değiştirir; katsayıları otomatik değiştirmez.
 
-Akış çizgileri cismin çevreleyen kutusuna göre saptırılan şematik yollardır. Renkler yerel hız/basınç verisi değildir. Parçacıklar yavaşlatılmış gösterilir. İz dalgalanması yalnızca animasyona etki eder. Yüzey basıncı, stall, duvar/zemin etkileri, sıkıştırılabilir akış veya cisimler arası etkileşim çözülmez. Her deney bir cisim içindir.
+Akış çizgileri artık kutu etrafına çizilmiş eğriler değildir. Döndürülmüş gerçek üçgenler, cisim çevresinde sıklaşan 3D hücre ağına aktarılır. Kapalı hacimler ve üçgenlerle kesişen hücreler katıdır; ayrı meshler birleşim olarak işlenir. Açık yüzeylerde güvenilir iç hacim varsayılmaz, yalnızca yüzey hücreleri engel sayılır. Konservatif raster nedeniyle küçük ayrıntılar yaklaşık bir hücre kalınlaşabilir.
+
+`u = ∇(x + ψ)` ve `∇·u = 0` için sonlu hacim Laplace sistemi çözülür. Cisim ve tünelin yan yüzeylerinde normal akı sıfırdır; bu bir **kayma** sınırıdır, viskoz no-slip değildir. Giriş/çıkışta `ψ = 0`; çözüm daha sonra seçilen ortalama giriş hızına ölçeklenir. Çözüm eksik Cholesky IC(0) önkoşullu eşlenik gradyanla, göreli artık hedefi `1e-6` olacak şekilde bulunur. `1e-5` üzerinde artık, tünele sığmayan cisim veya kapalı akış yolu durumunda çizgiler gösterilmez ve açıklama görünür. Ağdaki doğruluk bu cebirsel artıkla aynı şey değildir.
+
+Akım çizgileri yüz akılarını koruyan RT0 hız yeniden kurulumundan, uyarlamalı orta nokta adımlarıyla izlenir. Çizgi segmentlerinin katı hücrelere girmediği kontrol edilir; eğri yumuşatmasıyla köşeler kesilmez. Parçacıklar aynı izleme sürelerini kullanır ve yerel hızla **0,16×** yavaşlatılmış hareket eder. Yapay sinüs dalgalanması kaldırılmıştır. Yan/üst görünüm tek bir başlangıç düzleminin çizgilerini, 3D görünüm üç başlangıç düzlemini gösterir; asimetrik geometride izler düzlem dışına çıkabilir. Hesap Web Worker'da çalışır; geometri değiştirilince eski hesap iptal edilir ve eski çizgiler temizlenir.
+
+Bu hâlâ **viskozitesiz, sıkıştırılamaz, dönüsüz ideal akış** modelidir. Sınır tabaka, ayrılma, girdap izi, türbülans, stall ve sıkıştırılabilirlik çözülmez. Kanatta dolaşım/Kutta koşulu yoktur; bu nedenle kaldırmayı üreten gerçek kanat akışı değildir. Katsayılarla hesaplanan kuvvetler bu hız alanından türetilmez; kuvvet hesabına duvar etkisi eklenmez. Basınç renkleri yalnızca yüzey yöneliminden gelir, hesaplanan Pa/Cₚ değerleri değildir.
+
+Akış kaynakları: [MIT — Potansiyel akış sınır koşulları](https://web.mit.edu/fluids-modules/www/potential_flows/LecturesHTML/lec1011/node1.html), [MIT — Küre etrafında analitik ideal akış](https://web.mit.edu/fluids-modules/www/potential_flows/LecturesHTML/lec1011/node35.html), [NASA — Sınır tabaka ve ayrılma](https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/boundary-layer/).
 
 Kanat dışındaki modellerde otomatik referans alanı, döndürülmüş geometri yüzeylerinin yz izdüşüm birleşimidir; 160×160 raster yaklaşımı kullanır. Örtüşen yüzler iki kez sayılmaz. Karakteristik boy, yönelimden önceki en uzun boyuttur. Kanatta alan `4.32 × ölçek²` m², boy `1.2 × ölçek` m'dir. Elle girilen alan ölçekten bağımsız sabit kalır.
 
@@ -52,7 +60,7 @@ Kaynaklar: [NASA sürükleme denklemi](https://www1.grc.nasa.gov/beginners-guide
 
 ## Doğrulama
 
-`npm test` fizik bağıntılarını, sıfır hız durumunu, açı sınırlarını ve gerçek üçgen geometrisinin izdüşüm alanını kontrol eder.
+`npm test` fizik bağıntılarını, sıfır hız durumunu, açı sınırlarını ve gerçek üçgen geometrisinin izdüşüm alanını kontrol eder. Akış testleri ayrıca boş tüneli, kesitler arası debi korunumunu, katı yüzlerde sıfır normal hızı, küre simetrisini, analitik küre alanını (yüzeyden uzaktaki örnek noktalar), çizgi güvenliğini, farklı geometrileri ve döndürülmüş ince kanadı sınar.
 
 Uygulama 5173 portunda açıkken:
 
@@ -65,7 +73,11 @@ Bu script mevcut test Chromium'unu ayrı ve geçici bir profilde kullanır. Baş
 ## Dosyalar
 
 - `src/main.ts`: Türkçe arayüz, kontroller, kayıt ve dışa aktarım.
-- `src/scene.ts`: Three.js sahnesi, kamera, şematik akış ve animasyon.
+- `src/scene.ts`: Three.js sahnesi, kamera, hesaplanmış çizgiler ve animasyon.
+- `src/flow-geometry.ts`: Üçgenlerin konservatif 3D rasteri ve cisim yakınında sıklaşan ağ.
+- `src/flow-field.ts`: Potansiyel akış çözümü, akı koruyan hız alanı ve çizgi izleme.
+- `src/flow.worker.ts`: Arka plan hesabı ve başlangıç düzlemleri.
+- `src/flow-field.test.ts`: Analitik referans ve akış regresyonları.
 - `src/models.ts`: Hazır modeller ve izdüşüm alanı hesaplaması.
 - `src/import-model.ts`: Dosya okuyucuları ve geometri doğrulaması.
 - `src/physics.ts`: Birimlerden bağımsız arayüzü olan SI hesaplama çekirdeği.

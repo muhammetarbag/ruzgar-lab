@@ -9,3 +9,5 @@ uv run --with playwright python tests/browser_regression.py --base http://127.0.
 ```
 
 Farklı Chromium konumu için `--chromium /tam/yol/chromium` kullanın. Ekran görüntüleri ve sonuçlar `/tmp/ruzgar-lab-browser-checks` altında oluşturulur. 320, 390, 768 ve 1440 piksel genişlikler kontrol edilir.
+
+Akış regresyonları altı modelin Web Worker hesabının yakınsamasını, hızlı model değişiminde eski hesabın iptalini, tüneli aşan geometride açık hatayı ve ardından toparlanmayı da denetler. Sayısal alan/analitik referans testleri `npm test` içindedir.

@@ -4,7 +4,6 @@ export interface Conditions {
   temperature: number;
   viscosity: number;
   autoViscosity: boolean;
-  turbulence: number;
   yaw: number;
   pitch: number;
   roll: number;
@@ -24,7 +23,6 @@ export const defaults: Conditions = {
   temperature: 15,
   viscosity: 1.789e-5,
   autoViscosity: true,
-  turbulence: 4,
   yaw: 0,
   pitch: 0,
   roll: 0,
@@ -54,7 +52,7 @@ export function calculate(
   const kelvin = s.temperature + 273.15;
   if (
     ![
-      s.speed, s.pressure, s.temperature, s.viscosity, s.turbulence,
+      s.speed, s.pressure, s.temperature, s.viscosity,
       s.yaw, s.pitch, s.roll, s.scale, s.cd, s.cl, s.area,
       s.tunnelWidth, s.tunnelHeight, s.tunnelLength,
       projectedArea, referenceArea, length,
