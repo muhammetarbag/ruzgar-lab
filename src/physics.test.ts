@@ -55,6 +55,18 @@ describe("Kuvvet ve hava koşulları", () => {
   it("geçersiz fiziksel koşulları reddeder", () => {
     expect(() => sphere({ temperature: -273.15 })).toThrow();
     expect(() => sphere({ pressure: 0 })).toThrow();
+    for (const value of [NaN, Infinity, -Infinity]) {
+      for (const key of Object.keys(defaults)) {
+        if (typeof defaults[key as keyof typeof defaults] === "number")
+          expect(() => sphere({ [key]: value })).toThrow();
+      }
+      expect(() => calculate(defaults, value, 1, 1, false)).toThrow();
+      expect(() => calculate(defaults, 1, value, 1, false)).toThrow();
+      expect(() => calculate(defaults, 1, 1, value, false)).toThrow();
+    }
+    for (const change of [{ area: 0 }, { cd: -1 }, { scale: 0 },
+      { tunnelWidth: 0 }, { tunnelHeight: 0 }, { tunnelLength: 0 }])
+      expect(() => sphere(change)).toThrow();
   });
 });
 

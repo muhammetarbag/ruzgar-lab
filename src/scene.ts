@@ -70,7 +70,7 @@ export class TunnelScene {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.setClearColor("#e8f0f4", 1);
+    this.renderer.setClearColor("#102330", 1);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.3;
     this.renderer.domElement.setAttribute(
@@ -79,7 +79,7 @@ export class TunnelScene {
     );
     this.renderer.domElement.setAttribute("role", "img");
     host.prepend(this.renderer.domElement);
-    this.scene.fog = new THREE.Fog("#e8f0f4", 25, 65);
+    this.scene.fog = new THREE.Fog("#102330", 25, 65);
     this.scene.add(new THREE.HemisphereLight("#ffffff", "#9bafbd", 3));
     const sun = new THREE.DirectionalLight("#fff5e7", 4);
     sun.position.set(-4, 12, 7);
@@ -161,7 +161,7 @@ export class TunnelScene {
     const s = this.state;
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(s.tunnelLength + 6, s.tunnelWidth + 5),
-      new THREE.MeshStandardMaterial({ color: "#dce7ed", roughness: 0.9 }),
+      new THREE.MeshStandardMaterial({ color: "#172d3b", roughness: 0.9 }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.03;
@@ -170,8 +170,8 @@ export class TunnelScene {
     const grid = new THREE.GridHelper(
       Math.max(s.tunnelLength, s.tunnelWidth) + 4,
       Math.max(s.tunnelLength, s.tunnelWidth) + 4,
-      "#adc2cf",
-      "#c2d2dc",
+      "#53758c",
+      "#39576c",
     );
     grid.material.transparent = true;
     grid.material.opacity = 0.23;
@@ -247,7 +247,7 @@ export class TunnelScene {
         const curve = new THREE.CatmullRomCurve3(path, false, "centripetal");
         lines.add(new THREE.Mesh(
           new THREE.TubeGeometry(curve, segments, 0.014, 5, false),
-          new THREE.MeshBasicMaterial({ color: "#15517c", toneMapped: false }),
+          new THREE.MeshBasicMaterial({ color: "#8acfe5", toneMapped: false }),
         ));
       }
     this.flow.add(lines);
@@ -262,7 +262,7 @@ export class TunnelScene {
     this.dots = new THREE.Points(
       dotGeometry,
       new THREE.PointsMaterial({
-        color: "#d85812",
+        color: "#efae70",
         toneMapped: false,
         size: 0.10,
         transparent: true,

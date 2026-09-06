@@ -18,15 +18,20 @@ export async function importModel(
     );
   const file = models[0],
     urls: string[] = [];
+  const resourceErrors: string[] = [];
   const manager = new THREE.LoadingManager();
+  manager.onError = () => resourceErrors.push("Modelin bağlı bir dosyası yüklenemedi.");
   manager.setURLModifier((url) => {
-    if (url.startsWith("data:")) return url;
+    // GLTFLoader creates blob URLs for embedded GLB/glTF images.
+    if (url.startsWith("data:") || url.startsWith("blob:")) return url;
     const name = decodeURIComponent(url.split("/").pop() || "");
     const dependency = files.find((f) => f.name === name);
-    if (!dependency)
+    if (!dependency) {
+      resourceErrors.push(`Eksik model dosyası: ${name}.`);
       throw new Error(
         `Eksik model dosyası: ${name}. Model ve bağlı dosyalarını birlikte seçin.`,
       );
+    }
     const blob = URL.createObjectURL(dependency);
     urls.push(blob);
     return blob;
@@ -52,6 +57,8 @@ export async function importModel(
         ),
       );
     }
+    if (resourceErrors.length)
+      throw new Error(`${resourceErrors[0]} Model ve bağlı dosyalarını birlikte seçin.`);
     let triangles = 0;
     group.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;

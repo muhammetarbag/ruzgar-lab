@@ -53,13 +53,21 @@ export function calculate(
 ) {
   const kelvin = s.temperature + 273.15;
   if (
+    ![
+      s.speed, s.pressure, s.temperature, s.viscosity, s.turbulence,
+      s.yaw, s.pitch, s.roll, s.scale, s.cd, s.cl, s.area,
+      s.tunnelWidth, s.tunnelHeight, s.tunnelLength,
+      projectedArea, referenceArea, length,
+    ].every(Number.isFinite) ||
     kelvin <= 0 ||
     s.pressure <= 0 ||
     s.speed < 0 ||
     length <= 0 ||
     referenceArea < 0 ||
     projectedArea < 0 ||
-    s.viscosity <= 0
+    s.viscosity <= 0 ||
+    s.cd < 0 || s.area <= 0 || s.scale <= 0 ||
+    s.tunnelWidth <= 0 || s.tunnelHeight <= 0 || s.tunnelLength <= 0
   )
     throw new Error("Fiziksel girdiler geçerli aralıkta olmalı.");
   const density = s.pressure / (287.05 * kelvin);

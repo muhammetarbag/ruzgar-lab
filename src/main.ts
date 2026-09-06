@@ -262,13 +262,17 @@ function update(geometryChanged = false) {
   disable("cd", selected.id === "wing" && state.autoWing);
   disable("cl", selected.id === "wing" && state.autoWing);
   $("#wing-auto-row").hidden = selected.id !== "wing";
+  const computedInput = (key: string, value: number | null) => {
+    $<HTMLInputElement>(`#${key}`).value = value === null ? "" : String(value);
+    $<HTMLInputElement>(`[data-range="${key}"]`).value = String(value ?? 0);
+  };
   if (state.autoViscosity)
-    $<HTMLInputElement>("#viscosity").value = results.viscosity.toPrecision(4);
+    computedInput("viscosity", Number(results.viscosity.toPrecision(4)));
   if (!state.manualArea)
-    $<HTMLInputElement>("#area").value = results.area.toFixed(4);
+    computedInput("area", Number(results.area.toFixed(4)));
   if (selected.id === "wing" && state.autoWing) {
-    $<HTMLInputElement>("#cd").value = results.cd?.toFixed(4) ?? "";
-    $<HTMLInputElement>("#cl").value = results.cl?.toFixed(4) ?? "";
+    computedInput("cd", results.cd === null ? null : Number(results.cd.toFixed(4)));
+    computedInput("cl", results.cl === null ? null : Number(results.cl.toFixed(4)));
   }
   const warnings: string[] = [];
   if (results.wingOutsideRange)
