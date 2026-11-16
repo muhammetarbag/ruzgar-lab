@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculate, defaults, sutherland } from "./physics";
+import { calculate, defaults, sphereDragCoefficient, sutherland } from "./physics";
 import * as THREE from "three";
 import { catalog, centerModel, orient, projectedArea } from "./models";
 
@@ -139,5 +139,41 @@ describe("Yönelim: sapma → yunuslama → yatış", () => {
       expect(nose.y).toBeCloseTo(Math.sin(pitch * rad), 12);
       expect(Math.atan2(nose.z, -nose.x) / rad).toBeCloseTo(yaw, 9);
     }
+  });
+});
+
+describe("Pürüzsüz küre: Cᴅ(Re), Morrison (2013)", () => {
+  const ball = (changes = {}) =>
+    calculate({ ...defaults, ...changes }, Math.PI / 4, Math.PI / 4, 1, false, true);
+  it("sürünme akışında 24/Re'ye, alt-kritikte ~0,4–0,5'e iner", () => {
+    expect(sphereDragCoefficient(0.01) * 0.01).toBeCloseTo(24, 0);
+    expect(sphereDragCoefficient(1e4)).toBeCloseTo(0.393, 3);
+    expect(sphereDragCoefficient(1e5)).toBeGreaterThan(0.4);
+  });
+  it("Re ≈ 3·10⁵ çevresinde sürükleme krizi gösterir", () => {
+    expect(sphereDragCoefficient(2e5)).toBeGreaterThan(0.4);
+    expect(sphereDragCoefficient(3e5)).toBeLessThan(0.2);
+    expect(sphereDragCoefficient(4e5)).toBeLessThan(0.1);
+  });
+  it("otomatik modda Cᴅ hesaplanan Re'ye göre seçilir, kuvvet q·A·Cᴅ olur", () => {
+    const slow = ball({ speed: 2.5 }), mid = ball({ speed: 5 });
+    expect(slow.cd).toBeCloseTo(sphereDragCoefficient(slow.reynolds), 12);
+    expect(slow.cd).toBeGreaterThan(0.4);
+    expect(mid.cd).toBeLessThan(0.15);
+    expect(slow.drag).toBeCloseTo(slow.dynamicPressure * slow.area * slow.cd!, 9);
+    expect(slow.reynoldsOutsideRange).toBe(false);
+  });
+  it("Re > 10⁶'da korelasyonu sınırda tutar ve bunu bildirir", () => {
+    const r = ball({ speed: 40 });
+    expect(r.reynolds).toBeGreaterThan(1e6);
+    expect(r.cd).toBeCloseTo(sphereDragCoefficient(1e6), 12);
+    expect(r.reynoldsOutsideRange).toBe(true);
+  });
+  it("sıfır hızda kuvvet sıfırdır; elle katsayıda Cᴅ sabit kalır", () => {
+    expect(ball({ speed: 0 }).drag).toBe(0);
+    expect(ball({ speed: 0 }).cd).toBeNull();
+    const manual = ball({ autoSphere: false, speed: 2.5 });
+    expect(manual.cd).toBe(defaults.cd);
+    expect(manual.reynoldsOutsideRange).toBe(false);
   });
 });
