@@ -89,7 +89,7 @@ $("#app").innerHTML = `
     <aside class="sidebar left-sidebar" aria-label="Deney ayarları">
       <div class="sidebar-heading"><div><span class="eyebrow">DENEY DÜZENEĞİ</span><h1>Akışı keşfet.</h1></div>${icon("wind", 27)}</div>
       <section class="settings-section"><div class="section-heading"><h2>Hava koşulları</h2><span class="section-symbol">∞</span></div>
-        <div class="preset-row"><button data-preset="standard" class="chip active">Standart</button><button data-preset="breeze" class="chip">Hafif esinti</button><button data-preset="strong" class="chip">Kasırga kuvveti</button></div>
+        <div class="preset-row"><button data-preset="standard" class="chip active">Standart</button><button data-preset="breeze" class="chip">Hafif rüzgâr</button><button data-preset="strong" class="chip">Kasırga kuvveti</button></div>
         ${control("speed", "Rüzgâr hızı", "m/s", 0, 100, 0.5, "primary-control")}
         <div class="range-endpoints"><span>0 m/s</span><span id="speed-kmh">72 km/sa</span><span>100 m/s</span></div>
         ${control("pressure", "Mutlak basınç", "Pa", 10000, 200000, 25)}
@@ -433,7 +433,7 @@ document
 document.querySelectorAll<HTMLElement>("[data-preset]").forEach((button) =>
   button.addEventListener("click", () => {
     const preset = button.dataset.preset;
-    state.speed = preset === "breeze" ? 5 : preset === "strong" ? 40 : 20;
+    state.speed = preset === "breeze" ? 2.5 : preset === "strong" ? 40 : 20;
     state.pressure = defaults.pressure;
     state.temperature = defaults.temperature;
     document
