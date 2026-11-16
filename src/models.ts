@@ -243,6 +243,19 @@ export const catalog: ModelSpec[] = [
     build: () => car(true),
   },
 ];
+// Havacılık sırası: sapma (Y), yunuslama (yeni Z), yatış (yeni gövde X ekseni).
+// Burun −X, sağ kanat −Z yönündedir: +α burnu kaldırır, +yatış sağ kanadı indirir.
+export function orient(
+  object: THREE.Object3D,
+  s: { yaw: number; pitch: number; roll: number },
+) {
+  object.rotation.set(
+    (-s.roll * Math.PI) / 180,
+    (s.yaw * Math.PI) / 180,
+    (-s.pitch * Math.PI) / 180,
+    "YZX",
+  );
+}
 export function centerModel(group: THREE.Group) {
   group.updateMatrixWorld(true);
   group.position.sub(

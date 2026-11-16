@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calculate, defaults, sutherland } from "./physics";
 import * as THREE from "three";
-import { catalog, centerModel, projectedArea } from "./models";
+import { catalog, centerModel, orient, projectedArea } from "./models";
 
 describe("Kuvvet ve hava koşulları", () => {
   const sphere = (changes = {}) =>
@@ -102,6 +102,42 @@ describe("Geometri izdüşümü", () => {
           .getCenter(new THREE.Vector3())
           .length(),
       ).toBeLessThan(1e-6);
+    }
+  });
+});
+
+describe("Yönelim: sapma → yunuslama → yatış", () => {
+  const rad = Math.PI / 180;
+  // Gövde eksenleri: burun −X'e, sağ kanat −Z'ye, aşağı −Y'ye bakar; hava +X yönünde akar.
+  const axes = (yaw: number, pitch: number, roll: number) => {
+    const o = new THREE.Object3D();
+    orient(o, { yaw, pitch, roll });
+    const q = o.quaternion;
+    return {
+      nose: new THREE.Vector3(-1, 0, 0).applyQuaternion(q),
+      right: new THREE.Vector3(0, 0, -1).applyQuaternion(q),
+      down: new THREE.Vector3(0, -1, 0).applyQuaternion(q),
+    };
+  };
+  it("yatış sıfırken α ve β rüzgâr açılarına tam eşittir", () => {
+    const { nose, right, down } = axes(30, 20, 0);
+    const air = new THREE.Vector3(-1, 0, 0); // cismin havaya göre hızı
+    const u = air.dot(nose), v = air.dot(right), w = air.dot(down);
+    expect(Math.atan2(w, u) / rad).toBeCloseTo(20, 9);
+    expect(Math.asin(v) / rad).toBeCloseTo(30, 9);
+  });
+  it("yatış en son ve gövde ekseni etrafında uygulanır; burnu oynatmaz", () => {
+    const rolled = axes(30, 20, 60).nose, level = axes(30, 20, 0).nose;
+    expect(rolled.distanceTo(level)).toBeLessThan(1e-12);
+    expect(Math.asin(rolled.y) / rad).toBeCloseTo(20, 9);
+  });
+  it("pozitif yatış sağ kanadı indirir; büyük birleşik açılarda Euler bağıntısı tutar", () => {
+    expect(axes(0, 0, 30).right.y).toBeCloseTo(-0.5, 12);
+    for (const [yaw, pitch, roll] of [[30, 20, 60], [-120, 35, 150], [170, -40, -75]]) {
+      const { nose, right } = axes(yaw, pitch, roll);
+      expect(right.y).toBeCloseTo(-Math.sin(roll * rad) * Math.cos(pitch * rad), 12);
+      expect(nose.y).toBeCloseTo(Math.sin(pitch * rad), 12);
+      expect(Math.atan2(nose.z, -nose.x) / rad).toBeCloseTo(yaw, 9);
     }
   });
 });
