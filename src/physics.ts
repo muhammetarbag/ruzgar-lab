@@ -11,6 +11,7 @@ export interface Conditions {
   cd: number;
   cl: number;
   autoWing: boolean;
+  autoSphere: boolean;
   manualArea: boolean;
   area: number;
   tunnelWidth: number;
@@ -30,6 +31,7 @@ export const defaults: Conditions = {
   cd: 0.47,
   cl: 0,
   autoWing: true,
+  autoSphere: true,
   manualArea: false,
   area: 1,
   tunnelWidth: 8,
@@ -42,12 +44,25 @@ export function sutherland(temperatureK: number): number {
     (temperatureK + 110.4)
   );
 }
+// Pürüzsüz küre, düzgün akış. F. A. Morrison, An Introduction to Fluid Mechanics
+// (Cambridge UP, 2013), Fig. 8.13; "Data Correlation for Drag Coefficient for
+// Sphere" (Michigan Tech, 2016). Schlichting verisine uyar; Re ≤ 10⁶ için önerilir.
+export function sphereDragCoefficient(re: number): number {
+  return (
+    24 / re +
+    (2.6 * (re / 5)) / (1 + (re / 5) ** 1.52) +
+    (0.411 * (re / 2.63e5) ** -7.94) / (1 + (re / 2.63e5) ** -8) +
+    (0.25 * (re / 1e6)) / (1 + re / 1e6)
+  );
+}
+export const sphereReynoldsLimit = 1e6;
 export function calculate(
   s: Conditions,
   projectedArea: number,
   referenceArea: number,
   length: number,
   isWing: boolean,
+  isSphere = false,
 ) {
   const kelvin = s.temperature + 273.15;
   if (
@@ -77,10 +92,18 @@ export function calculate(
   const cl = wingAutomatic
     ? (2 * Math.PI * ((s.pitch * Math.PI) / 180)) / (1 + 2 / 3)
     : s.cl;
-  const cd = wingAutomatic ? 0.02 + (cl * cl) / (Math.PI * 3 * 0.8) : s.cd;
   const wingOutsideRange =
     wingAutomatic &&
     (Math.abs(s.pitch) > 12 || Math.abs(s.yaw) > 15 || Math.abs(s.roll) > 15);
+  const reynolds = (density * s.speed * length) / viscosity;
+  const sphereAutomatic = isSphere && s.autoSphere;
+  const cd = wingAutomatic
+    ? 0.02 + (cl * cl) / (Math.PI * 3 * 0.8)
+    : !sphereAutomatic
+      ? s.cd
+      : reynolds > 0
+        ? sphereDragCoefficient(Math.min(reynolds, sphereReynoldsLimit))
+        : null;
   return {
     density,
     viscosity,
@@ -88,12 +111,13 @@ export function calculate(
     area,
     cd: wingOutsideRange ? null : cd,
     cl: wingOutsideRange ? null : cl,
-    drag: wingOutsideRange ? null : dynamicPressure * area * cd,
+    drag: wingOutsideRange ? null : cd === null ? 0 : dynamicPressure * area * cd,
     lift: wingOutsideRange ? null : dynamicPressure * area * cl,
-    reynolds: (density * s.speed * length) / viscosity,
+    reynolds,
     mach: s.speed / Math.sqrt(1.4 * 287.05 * kelvin),
     blockage: (projectedArea / (s.tunnelWidth * s.tunnelHeight)) * 100,
     wingOutsideRange,
+    reynoldsOutsideRange: sphereAutomatic && reynolds > sphereReynoldsLimit,
   };
 }
 export type Results = ReturnType<typeof calculate>;

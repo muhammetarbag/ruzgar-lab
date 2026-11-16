@@ -89,7 +89,7 @@ $("#app").innerHTML = `
     <aside class="sidebar left-sidebar" aria-label="Deney ayarları">
       <div class="sidebar-heading"><div><span class="eyebrow">DENEY DÜZENEĞİ</span><h1>Akışı keşfet.</h1></div>${icon("wind", 27)}</div>
       <section class="settings-section"><div class="section-heading"><h2>Hava koşulları</h2><span class="section-symbol">∞</span></div>
-        <div class="preset-row"><button data-preset="standard" class="chip active">Standart</button><button data-preset="breeze" class="chip">Hafif esinti</button><button data-preset="strong" class="chip">Kasırga kuvveti</button></div>
+        <div class="preset-row"><button data-preset="standard" class="chip active">Standart</button><button data-preset="breeze" class="chip">Hafif rüzgâr</button><button data-preset="strong" class="chip">Kasırga kuvveti</button></div>
         ${control("speed", "Rüzgâr hızı", "m/s", 0, 100, 0.5, "primary-control")}
         <div class="range-endpoints"><span>0 m/s</span><span id="speed-kmh">72 km/sa</span><span>100 m/s</span></div>
         ${control("pressure", "Mutlak basınç", "Pa", 10000, 200000, 25)}
@@ -108,9 +108,10 @@ $("#app").innerHTML = `
         <details class="advanced"><summary>Geometri ve katsayılar</summary><div class="details-body">
           ${control("roll", "Yatış açısı", "°", -180, 180, 1)}
           <label class="check-row" id="wing-auto-row"><input type="checkbox" id="autoWing" checked/> Kanat katsayılarını yaklaşık hesapla</label>
+          <label class="check-row" id="sphere-auto-row"><input type="checkbox" id="autoSphere" checked/> Küre Cᴅ'sini Reynolds sayısından hesapla</label>
           ${control("cd", "Sürükleme katsayısı · Cᴅ", "", 0, 3, 0.01)}
           ${control("cl", "Kaldırma katsayısı · Cʟ", "", -3, 3, 0.01)}
-          <p class="hint" id="coefficient-note">Katsayılar örnek varsayımlardır; ölçülmüş araç veya hayvan verisi değildir. Yönelim değişince manuel katsayıları da gözden geçirin.</p>
+          <p class="hint" id="coefficient-note">Küre dışındaki katsayılar örnek varsayımlardır; ölçülmüş araç veya hayvan verisi değildir. Yönelim değişince manuel katsayıları da gözden geçirin.</p>
           <label class="check-row"><input type="checkbox" id="manualArea"/> Referans alanını elle gir</label>
           ${control("area", "Referans alanı", "m²", 0.0001, 1000, 0.01)}
           <p class="hint" id="area-note"></p>
@@ -179,7 +180,7 @@ $("#app").innerHTML = `
     <p>Kuru hava için R = 287,05 J/(kg·K). Basınç mutlaktır; sıcaklık Kelvin'e çevrilir. Viskozite Sutherland bağıntısıyla veya girdiğiniz değerle belirlenir. Mach sayısı kuru hava için γ = 1,4 ile hesaplanır.</p>
     <h3>Geometri ve katsayılar</h3><p>Küp, küre, inek ve araçlarda alan, döndürülmüş üçgen yüzeylerin akışa dik izdüşümünün 160 × 160 ızgarada yaklaşık birleşim alanıdır. Karakteristik boy, yönelimden önceki en uzun boyuttur. Kanatta referans alanı 1,2 × 3,6 m² planform alanıdır; karakteristik boy 1,2 m veterdir. Ölçek alanı karesiyle, boyu doğrusal değiştirir. Elle alan girerseniz o değer sabit kalır.</p>
     <p>Kanat NACA 0012 kesitli, açıklık oranı 3 olan temsili sonlu kanattır. Otomatik modda Cʟ = 2πα / (1 + 2/3), Cᴅ = 0,02 + Cʟ²/(π·3·0,8). Yalnızca |α| ≤ 12°, |β| ≤ 15° ve |yatış| ≤ 15° için kuvvet gösterilir; stall modellenmez. Kuvvet yönleri şematiktir, vektör boyları logaritmik görsel ölçek kullanır.</p>
-    <p>Diğer modellerin başlangıç Cᴅ değerleri eğitim amaçlı varsayımlardır (inek 0,9; Spider 0,45; Connect 0,4; küre 0,47; küp 1,05). Bunlar belirli bir aracın ölçülmüş katsayıları değildir. Manuel katsayılar açı, Reynolds sayısı veya türbülansla otomatik değişmez; uygun veriniz varsa düzenleyin.</p>
+    <p>Pürüzsüz kürede otomatik modda Cᴅ, Reynolds sayısından Morrison (2013) bağıntısıyla hesaplanır. Re ≈ 2–4·10⁵ aralığında sınır tabaka türbülansa geçer, ayrılma geriye kayar ve Cᴅ yaklaşık 0,4'ten 0,1'e düşer (sürükleme krizi). Bağıntı Re ≤ 10⁶ için önerildiğinden, daha büyük Re'de Cᴅ 10⁶'daki değerde tutulur ve uyarı gösterilir. Diğer modellerin Cᴅ değerleri sabit, eğitim amaçlı varsayımlardır (inek 0,9; Spider 0,45; Connect 0,4; küp 1,05). Keskin köşeli küpte ayrılma köşede sabitlendiği için Cᴅ yüksek Re'de Re'ye az bağlıdır; araç ve inek değerleri ise belirli bir cismin ölçülmüş katsayıları değildir. Bu sabit katsayılar açı, Reynolds sayısı veya türbülansla otomatik değişmez; uygun veriniz varsa düzenleyin.</p>
     <h3>Görselleştirme sınırları</h3><p>Üçgen geometri, cisim yakınında sıklaşan bir 3D hücre ağına aktarılır. Bu ağ üzerinde sıkıştırılamaz ve dönüsüz ideal akış için Laplace denklemi çözülür; çizgiler hesaplanan hız alanını izler. Cisim yüzeylerinde ve tünelin yan duvarlarında normal hız sıfırdır (kayma sınırı). Giriş ve çıkışta potansiyel farkı uygulanır; ortalama giriş hızı seçtiğiniz değere ölçeklenir. Parçacıklar aynı alanın yerel hızıyla, 0,16× yavaşlatılmış olarak hareket eder. İnce ayrıntılar hücre boyutu kadar kalınlaşabilir; açık modellerde yalnızca yüzey hücreleri engel sayılır. Bu, viskoz Navier–Stokes/CFD çözümü değildir: sınır tabaka, ayrılma, girdap izi, türbülans, stall ve sıkıştırılabilirlik çözülmez. Kanatta dolaşım ve Kutta koşulu yoktur; dolayısıyla bu çizgiler kaldırmayı üreten gerçek kanat akışını göstermez. Kuvvetler ayrı katsayı hesabıdır. Basınç renkleri yalnızca yüzey yöneliminden gelir; hesaplanan Pa/Cₚ değerleri değildir.</p>
     <h3>Kendi modelini yükle</h3><p>GLB / glTF 2.0, OBJ ve ASCII / binary STL desteklenir. glTF'nin .bin ve dokularını birlikte seçin. OBJ malzemeleri içe aktarılmaz. Sıkıştırmalı Draco, Meshopt, KTX, iskelet animasyonu ve morph modellerini önce statik, sıkıştırmasız mesh olarak dışa aktarın. 50 MB ve 150 bin üçgen sınırı vardır.</p>
     <p>Yüklenen modelin en uzun boyutu başlangıçta <strong>1 metreye</strong> normalize edilir. Gerçek uzunluğu metre cinsinden ölçek alanına girin (ör. 4,4 m → 4,4×). Gerekirse açılarla düzeltin: yukarı +Y, hava akışı +X. Yükleme Cᴅ veya Cʟ'yi geometriden çıkarmaz; bu katsayıları siz seçersiniz.</p>
@@ -225,6 +226,7 @@ function update(geometryChanged = false) {
     reference,
     currentLength,
     selected.id === "wing",
+    selected.id === "sphere",
   );
   tunnel.setForces(results.drag, results.lift);
   const fields: Record<string, string> = {
@@ -259,9 +261,11 @@ function update(geometryChanged = false) {
   };
   disable("viscosity", state.autoViscosity);
   disable("area", !state.manualArea);
-  disable("cd", selected.id === "wing" && state.autoWing);
+  const sphereAutomatic = selected.id === "sphere" && state.autoSphere;
+  disable("cd", (selected.id === "wing" && state.autoWing) || sphereAutomatic);
   disable("cl", selected.id === "wing" && state.autoWing);
   $("#wing-auto-row").hidden = selected.id !== "wing";
+  $("#sphere-auto-row").hidden = selected.id !== "sphere";
   $("#wing-flow-note").hidden = selected.id !== "wing";
   const computedInput = (key: string, value: number | null) => {
     $<HTMLInputElement>(`#${key}`).value = value === null ? "" : String(value);
@@ -275,10 +279,16 @@ function update(geometryChanged = false) {
     computedInput("cd", results.cd === null ? null : Number(results.cd.toFixed(4)));
     computedInput("cl", results.cl === null ? null : Number(results.cl.toFixed(4)));
   }
+  if (sphereAutomatic)
+    computedInput("cd", results.cd === null ? null : Number(results.cd.toFixed(4)));
   const warnings: string[] = [];
   if (results.wingOutsideRange)
     warnings.push(
       "Kanat yaklaşımının açı sınırı aşıldı. |α| ≤ 12°, |β| ve |yatış| ≤ 15° olmalı veya katsayıları elle girin.",
+    );
+  if (results.reynoldsOutsideRange)
+    warnings.push(
+      "Re > 10⁶: Morrison küre bağıntısı bu aralık için önerilmez. Cᴅ, Re = 10⁶ değerinde tutuldu.",
     );
   if (results.mach > 0.3)
     warnings.push(
@@ -319,7 +329,7 @@ function syncInputs() {
       state[(input.dataset.key || input.dataset.range) as keyof Conditions],
     );
   }
-  for (const key of ["autoViscosity", "autoWing", "manualArea"] as const)
+  for (const key of ["autoViscosity", "autoWing", "autoSphere", "manualArea"] as const)
     $<HTMLInputElement>(`#${key}`).checked = state[key];
 }
 
@@ -361,7 +371,7 @@ for (const input of document.querySelectorAll<HTMLInputElement>(
     );
   });
 }
-for (const key of ["autoViscosity", "autoWing", "manualArea"] as const) {
+for (const key of ["autoViscosity", "autoWing", "autoSphere", "manualArea"] as const) {
   $<HTMLInputElement>(`#${key}`).addEventListener("change", (e) => {
     state[key] = (e.target as HTMLInputElement).checked;
     if (key === "manualArea" && state.manualArea) {
@@ -375,6 +385,10 @@ for (const key of ["autoViscosity", "autoWing", "manualArea"] as const) {
     if (key === "autoWing" && !state.autoWing) {
       state.cd = results.cd ?? selected.cd;
       state.cl = results.cl ?? 0;
+      syncInputs();
+    }
+    if (key === "autoSphere" && !state.autoSphere) {
+      state.cd = Number((results.cd ?? selected.cd).toFixed(4));
       syncInputs();
     }
     update();
@@ -393,6 +407,7 @@ function selectModel(spec: ModelSpec) {
     cl: 0,
     manualArea: false,
     autoWing: true,
+    autoSphere: true,
   };
   tunnel.setObject(spec.build(), state);
   document.querySelectorAll<HTMLElement>("[data-model]").forEach((b) => {
@@ -418,7 +433,7 @@ document
 document.querySelectorAll<HTMLElement>("[data-preset]").forEach((button) =>
   button.addEventListener("click", () => {
     const preset = button.dataset.preset;
-    state.speed = preset === "breeze" ? 5 : preset === "strong" ? 40 : 20;
+    state.speed = preset === "breeze" ? 2.5 : preset === "strong" ? 40 : 20;
     state.pressure = defaults.pressure;
     state.temperature = defaults.temperature;
     document

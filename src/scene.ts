@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { centerModel, disposeObject, projectedArea } from "./models";
+import { centerModel, disposeObject, orient, projectedArea } from "./models";
 import type { Conditions } from "./physics";
 import { positionAtTime, type FlowPath, type Point } from "./flow-field";
 import { meshTriangles, type FlowRequest } from "./flow-geometry";
@@ -152,12 +152,7 @@ export class TunnelScene {
     this.state = { ...s };
     this.pressureMaterial.uniforms.windOn.value = s.speed > 0 ? 1 : 0;
     if (geometryChanged || tunnelChanged) {
-      this.object.rotation.set(
-        (s.roll * Math.PI) / 180,
-        (s.yaw * Math.PI) / 180,
-        (-s.pitch * Math.PI) / 180,
-        "YXZ",
-      );
+      orient(this.object, s);
       this.object.scale.setScalar(s.scale);
       this.object.position.set(0, s.tunnelHeight / 2, 0);
       this.object.updateMatrixWorld(true);

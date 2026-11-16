@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { calculate, defaults, sutherland } from "./physics";
+import { calculate, defaults, sphereDragCoefficient, sutherland } from "./physics";
 import * as THREE from "three";
-import { catalog, centerModel, projectedArea } from "./models";
+import { catalog, centerModel, orient, projectedArea } from "./models";
 
 describe("Kuvvet ve hava koşulları", () => {
   const sphere = (changes = {}) =>
@@ -103,5 +103,77 @@ describe("Geometri izdüşümü", () => {
           .length(),
       ).toBeLessThan(1e-6);
     }
+  });
+});
+
+describe("Yönelim: sapma → yunuslama → yatış", () => {
+  const rad = Math.PI / 180;
+  // Gövde eksenleri: burun −X'e, sağ kanat −Z'ye, aşağı −Y'ye bakar; hava +X yönünde akar.
+  const axes = (yaw: number, pitch: number, roll: number) => {
+    const o = new THREE.Object3D();
+    orient(o, { yaw, pitch, roll });
+    const q = o.quaternion;
+    return {
+      nose: new THREE.Vector3(-1, 0, 0).applyQuaternion(q),
+      right: new THREE.Vector3(0, 0, -1).applyQuaternion(q),
+      down: new THREE.Vector3(0, -1, 0).applyQuaternion(q),
+    };
+  };
+  it("yatış sıfırken α ve β rüzgâr açılarına tam eşittir", () => {
+    const { nose, right, down } = axes(30, 20, 0);
+    const air = new THREE.Vector3(-1, 0, 0); // cismin havaya göre hızı
+    const u = air.dot(nose), v = air.dot(right), w = air.dot(down);
+    expect(Math.atan2(w, u) / rad).toBeCloseTo(20, 9);
+    expect(Math.asin(v) / rad).toBeCloseTo(30, 9);
+  });
+  it("yatış en son ve gövde ekseni etrafında uygulanır; burnu oynatmaz", () => {
+    const rolled = axes(30, 20, 60).nose, level = axes(30, 20, 0).nose;
+    expect(rolled.distanceTo(level)).toBeLessThan(1e-12);
+    expect(Math.asin(rolled.y) / rad).toBeCloseTo(20, 9);
+  });
+  it("pozitif yatış sağ kanadı indirir; büyük birleşik açılarda Euler bağıntısı tutar", () => {
+    expect(axes(0, 0, 30).right.y).toBeCloseTo(-0.5, 12);
+    for (const [yaw, pitch, roll] of [[30, 20, 60], [-120, 35, 150], [170, -40, -75]]) {
+      const { nose, right } = axes(yaw, pitch, roll);
+      expect(right.y).toBeCloseTo(-Math.sin(roll * rad) * Math.cos(pitch * rad), 12);
+      expect(nose.y).toBeCloseTo(Math.sin(pitch * rad), 12);
+      expect(Math.atan2(nose.z, -nose.x) / rad).toBeCloseTo(yaw, 9);
+    }
+  });
+});
+
+describe("Pürüzsüz küre: Cᴅ(Re), Morrison (2013)", () => {
+  const ball = (changes = {}) =>
+    calculate({ ...defaults, ...changes }, Math.PI / 4, Math.PI / 4, 1, false, true);
+  it("sürünme akışında 24/Re'ye, alt-kritikte ~0,4–0,5'e iner", () => {
+    expect(sphereDragCoefficient(0.01) * 0.01).toBeCloseTo(24, 0);
+    expect(sphereDragCoefficient(1e4)).toBeCloseTo(0.393, 3);
+    expect(sphereDragCoefficient(1e5)).toBeGreaterThan(0.4);
+  });
+  it("Re ≈ 3·10⁵ çevresinde sürükleme krizi gösterir", () => {
+    expect(sphereDragCoefficient(2e5)).toBeGreaterThan(0.4);
+    expect(sphereDragCoefficient(3e5)).toBeLessThan(0.2);
+    expect(sphereDragCoefficient(4e5)).toBeLessThan(0.1);
+  });
+  it("otomatik modda Cᴅ hesaplanan Re'ye göre seçilir, kuvvet q·A·Cᴅ olur", () => {
+    const slow = ball({ speed: 2.5 }), mid = ball({ speed: 5 });
+    expect(slow.cd).toBeCloseTo(sphereDragCoefficient(slow.reynolds), 12);
+    expect(slow.cd).toBeGreaterThan(0.4);
+    expect(mid.cd).toBeLessThan(0.15);
+    expect(slow.drag).toBeCloseTo(slow.dynamicPressure * slow.area * slow.cd!, 9);
+    expect(slow.reynoldsOutsideRange).toBe(false);
+  });
+  it("Re > 10⁶'da korelasyonu sınırda tutar ve bunu bildirir", () => {
+    const r = ball({ speed: 40 });
+    expect(r.reynolds).toBeGreaterThan(1e6);
+    expect(r.cd).toBeCloseTo(sphereDragCoefficient(1e6), 12);
+    expect(r.reynoldsOutsideRange).toBe(true);
+  });
+  it("sıfır hızda kuvvet sıfırdır; elle katsayıda Cᴅ sabit kalır", () => {
+    expect(ball({ speed: 0 }).drag).toBe(0);
+    expect(ball({ speed: 0 }).cd).toBeNull();
+    const manual = ball({ autoSphere: false, speed: 2.5 });
+    expect(manual.cd).toBe(defaults.cd);
+    expect(manual.reynoldsOutsideRange).toBe(false);
   });
 });
